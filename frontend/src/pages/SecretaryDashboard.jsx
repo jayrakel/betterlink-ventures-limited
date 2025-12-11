@@ -408,7 +408,7 @@ export default function SecretaryDashboard({ user, onLogout }) {
                                             <tr key={a.id} className="hover:bg-slate-50">
                                                 <td className="p-3 font-bold text-slate-700">{a.name}<br/><span className="text-xs font-normal text-slate-400">{a.location}</span></td>
                                                 <td className="p-3"><span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold text-slate-600">{a.type}</span></td>
-                                                <td className="p-3 text-emerald-600 font-bold">KES {parseFloat(a.value).toLocaleString()}</td>
+                                                <td className="p-3 text-emerald-600 font-bold">KES {parseFloat(a.current_value).toLocaleString()}</td>
                                                 <td className="p-3 text-xs text-slate-500">{new Date(a.created_at).toLocaleDateString()}</td>
                                             </tr>
                                         ))}
