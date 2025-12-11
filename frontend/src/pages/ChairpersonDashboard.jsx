@@ -379,7 +379,10 @@ export default function ChairpersonDashboard({ user, onLogout }) {
                 <td className="px-6 py-4 font-medium text-slate-900">{item.full_name || 'Member'}</td>
                 <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold ${getTypeStyle(item.type)}`}>{item.type === 'FEE_PAYMENT' ? 'LOAN_FORM_FEE' : item.type}</span></td>
                 <td className="px-6 py-4 text-slate-600 text-xs max-w-[200px] truncate" title={item.description}>{item.description || '-'}</td>
-                <td className={`px-6 py-4 font-mono font-bold ${item.amount < 0 ? 'text-red-600' : 'text-slate-700'}`}>KES {Math.abs(parseFloat(item.amount)).toLocaleString()}{item.amount < 0 && <span className="text-xs font-normal text-red-400 ml-1">(Dr)</span>}</td>
+                {/* ✅ FIX: Use 'current_value' and fallback to 0 to prevent NaN */}
+<td className="p-3 text-emerald-600 font-bold">
+    KES {parseFloat(a.current_value || a.value || 0).toLocaleString()}
+</td>
                 <td className="px-6 py-4 text-xs text-slate-400">{new Date(item.created_at).toLocaleDateString()}</td>
             </tr>
         ));

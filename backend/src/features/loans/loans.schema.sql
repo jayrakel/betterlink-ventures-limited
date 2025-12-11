@@ -37,3 +37,11 @@ CREATE TABLE IF NOT EXISTS public.votes (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(loan_application_id, user_id)
 );
+
+DO $$ 
+BEGIN 
+    ALTER TABLE loan_applications ADD COLUMN IF NOT EXISTS disbursed_at TIMESTAMP;
+    ALTER TABLE loan_applications ADD COLUMN IF NOT EXISTS total_due NUMERIC(15,2) DEFAULT 0;
+    ALTER TABLE loan_applications ADD COLUMN IF NOT EXISTS interest_amount NUMERIC(15,2) DEFAULT 0;
+    ALTER TABLE loan_applications ADD COLUMN IF NOT EXISTS fee_transaction_ref VARCHAR(100);
+END $$;

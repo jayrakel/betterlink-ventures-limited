@@ -22,3 +22,8 @@ CREATE TABLE IF NOT EXISTS dividend_allocations (
     payment_date DATE, -- ✅ Added this
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+DO $$ 
+BEGIN 
+    ALTER TABLE dividend_allocations ADD COLUMN IF NOT EXISTS payment_date DATE DEFAULT CURRENT_DATE;
+END $$;

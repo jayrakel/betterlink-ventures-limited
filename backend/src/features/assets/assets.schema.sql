@@ -1,3 +1,4 @@
+-- 1. Create Tables (If they don't exist)
 CREATE TABLE IF NOT EXISTS fixed_assets (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -8,7 +9,7 @@ CREATE TABLE IF NOT EXISTS fixed_assets (
     description TEXT,
     status VARCHAR(20) DEFAULT 'ACTIVE',
     purchase_date DATE DEFAULT CURRENT_DATE,
-    created_by INTEGER REFERENCES users(id), -- This is the column you were missing
+    created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -26,23 +27,25 @@ CREATE TABLE IF NOT EXISTS operational_expenses (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ✅ AUTO-MIGRATION BLOCK (Fixes your specific error)
+-- 2. Auto-Repair Block (Runs every time init_db.js is called)
 DO $$ 
 BEGIN 
-    -- 1. Fix 'created_by' (The error you are seeing)
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fixed_assets' AND column_name='added_by') THEN
-        ALTER TABLE fixed_assets RENAME COLUMN added_by TO created_by;
-    ELSE
-        ALTER TABLE fixed_assets ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id);
-    END IF;
-
-    -- 2. Fix 'value' vs 'current_value' (Fixes NaN issues)
+    -- Fix 1: Rename legacy 'value' column to 'current_value' to prevent data loss
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fixed_assets' AND column_name='value') THEN
         ALTER TABLE fixed_assets RENAME COLUMN value TO current_value;
     END IF;
 
-    -- 3. Ensure other columns exist
+    -- Fix 2: Rename 'added_by' to 'created_by' if it exists (legacy support)
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fixed_assets' AND column_name='added_by') THEN
+        ALTER TABLE fixed_assets RENAME COLUMN added_by TO created_by;
+    END IF;
+
+    -- Fix 3: Ensure all required columns exist (Safe to run multiple times)
     ALTER TABLE fixed_assets ADD COLUMN IF NOT EXISTS purchase_value NUMERIC(15, 2) DEFAULT 0;
     ALTER TABLE fixed_assets ADD COLUMN IF NOT EXISTS current_value NUMERIC(15, 2) DEFAULT 0;
     ALTER TABLE fixed_assets ADD COLUMN IF NOT EXISTS purchase_date DATE DEFAULT CURRENT_DATE;
+    ALTER TABLE fixed_assets ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id);
+
+    -- Fix 4: Data consistency (If purchase_value is 0, assume it equals current_value)
+    UPDATE fixed_assets SET purchase_value = current_value WHERE purchase_value = 0 AND current_value > 0;
 END $$;
