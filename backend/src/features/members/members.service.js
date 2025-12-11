@@ -32,4 +32,21 @@ const getAllMembers = async () => {
     return result.rows;
 };
 
-module.exports = { getProfile, updateProfile, getAllMembers };
+const logMemberMovement = async (adminId, data) => {
+    const { user_id, action_type, reason } = data;
+    
+    // 1. Log
+    await db.query(
+        "INSERT INTO member_movement_log (user_id, action_type, reason, recorded_by) VALUES ($1, $2, $3, $4)",
+        [user_id, action_type, reason, adminId]
+    );
+
+    // 2. Status Update
+    if (action_type === 'LEFT' || action_type === 'SUSPENDED') {
+        await db.query("UPDATE users SET is_active = false WHERE id = $1", [user_id]);
+    } else if (action_type === 'REINSTATED') {
+        await db.query("UPDATE users SET is_active = true WHERE id = $1", [user_id]);
+    }
+};
+
+module.exports = { getProfile, updateProfile, getAllMembers, logMemberMovement };

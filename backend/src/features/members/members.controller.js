@@ -29,4 +29,11 @@ const listMembers = async (req, res) => {
     }
 };
 
-module.exports = { getMyProfile, updateMyProfile, listMembers };
+const logMovement = async (req, res) => {
+    try {
+        await memberService.logMemberMovement(req.user.id, req.body);
+        res.json({ message: "Member status updated and logged." });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+module.exports = { getMyProfile, updateMyProfile, listMembers, logMovement };
