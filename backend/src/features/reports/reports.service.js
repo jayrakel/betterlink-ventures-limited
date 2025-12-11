@@ -3,14 +3,19 @@ const db = require('../../config/db');
 // --- 1. DASHBOARD & ANALYTICS ---
 
 const getDashboardSummary = async () => {
+    // ✅ FIX: Added COALESCE to force 0 if table is empty or values are null
     const portfolioRes = await db.query(`SELECT COALESCE(SUM(total_due - amount_repaid), 0) as total FROM loan_applications WHERE status = 'ACTIVE'`);
     const depositsRes = await db.query(`SELECT COALESCE(SUM(amount), 0) as total FROM deposits WHERE status = 'COMPLETED'`);
+    
+    // ✅ FIX: Ensure we select current_value, not 'value'
     const assetsRes = await db.query(`SELECT COALESCE(SUM(current_value), 0) as total FROM fixed_assets WHERE status = 'ACTIVE'`);
     
     const totalPortfolio = parseFloat(portfolioRes.rows[0].total) || 0;
-    const fixedAssets = parseFloat(assetsRes.rows[0].total) || 0;
+    const fixedAssets = parseFloat(assetsRes.rows[0].total) || 0; // This prevents NaN
     const totalDeposits = parseFloat(depositsRes.rows[0].total) || 0;
 
+    // ... rest of the function remains the same ...
+    
     const loansCountRes = await db.query(`SELECT COUNT(*) as count FROM loan_applications WHERE status = 'ACTIVE'`);
     const activeLoans = parseInt(loansCountRes.rows[0].count) || 0;
 

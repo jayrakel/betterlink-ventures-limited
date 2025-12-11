@@ -14,6 +14,7 @@ const login = async (req, res) => {
     try {
         const { user, token } = await authService.loginUser(req.body.email, req.body.password);
         
+        // Keep the cookie for security (optional usage)
         const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('token', token, {
             httpOnly: true,
@@ -22,8 +23,10 @@ const login = async (req, res) => {
             maxAge: 8 * 60 * 60 * 1000 
         });
 
+        // ✅ FIX: Send token in JSON so existing frontend logic works
         res.json({ 
             message: "Login successful", 
+            token: token, // <--- ADDED THIS
             user: { 
                 id: user.id, 
                 name: user.full_name, 

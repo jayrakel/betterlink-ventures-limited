@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const controller = require('./auth.controller');
 const { authenticateUser } = require('./auth.middleware');
-const { validate, registerSchema } = require('../../../modules/common/validation'); // Keeping generic validation for now
+const { validate, registerSchema } = require('../../shared/validation'); // Keeping generic validation for now
 
 router.post('/register', validate(registerSchema), controller.register);
 router.post('/login', controller.login);

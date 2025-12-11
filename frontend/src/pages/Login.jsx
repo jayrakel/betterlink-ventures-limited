@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loginUser } from '../features/auth/services/authService';
 import api from '../api'; 
 import { ShieldCheck, Lock, Mail, ChevronRight, AlertTriangle } from 'lucide-react';
 
@@ -32,8 +33,8 @@ export default function Login({ setUser }) {
     setError('');
     
     try {
-      const res = await api.post('/api/auth/login', { email, password });
-      const { user } = res.data;
+      const response = await loginUser({ email, password }); // Use the service
+      const { user, token } = response; // 'response' IS the data now
       
       // 1. Save User
       localStorage.setItem('sacco_user', JSON.stringify(user));
