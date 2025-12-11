@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet'); 
 const cookieParser = require('cookie-parser'); 
 const bcrypt = require('bcrypt');
-const db = require('./db');
+const db = require('./src/config/db');
 const path = require('path');
 require('dotenv').config();
 
@@ -47,11 +47,12 @@ const loginLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 20, message: { er
 const apiLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
 
 // Routes
-const authRoutes = require('./modules/auth/routes');
-const loanRoutes = require('./modules/loans'); 
-const paymentRoutes = require('./modules/payments/routes');
-const depositRoutes = require('./modules/deposits/routes');
-const settingsModule = require('./modules/settings/routes');
+const authRoutes = require('./src/features/auth/auth.routes');
+const memberRoutes = require('./src/features/members/members.routes');
+const settingsRoutes = require('./src/features/settings/settings.routes');
+const loanRoutes = require('./src/features/loans/loans.routes'); 
+const paymentRoutes = require('./src/features/payments/payments.routes');
+const depositRoutes = require('./src/features/deposits/deposits.routes');
 const reportRoutes = require('./modules/reports/routes');
 const dividendRoutes = require('./modules/dividends/routes');
 const advancedReportRoutes = require('./modules/reports/advanced.routes');
@@ -99,11 +100,13 @@ router.post('/expenses', authenticateUser, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.use('/api/auth', loginLimiter, authRoutes); 
+app.use('/api/auth', loginLimiter, authRoutes);
+app.use('/api/auth', apiLimiter, memberRoutes);
+app.use('/api/settings', apiLimiter, settingsRoutes); 
 app.use('/api/loan', apiLimiter, loanRoutes); 
 app.use('/api/payments', apiLimiter, paymentRoutes); 
 app.use('/api/deposits', apiLimiter, depositRoutes);
-app.use('/api/settings', settingsModule.router); 
+// app.use('/api/settings', settingsModule.router); 
 app.use('/api/reports', apiLimiter, reportRoutes);
 app.use('/api/dividends', apiLimiter, dividendRoutes);
 app.use('/api/advanced-reports', apiLimiter, advancedReportRoutes);
