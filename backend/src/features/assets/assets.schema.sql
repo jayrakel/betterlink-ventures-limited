@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS fixed_assets (
     location VARCHAR(255),
     description TEXT,
     status VARCHAR(20) DEFAULT 'ACTIVE',
+    purchase_date DATE DEFAULT CURRENT_DATE,  -- ✅ Added this
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -22,3 +23,4 @@ CREATE TABLE IF NOT EXISTS operational_expenses (
     expense_date DATE DEFAULT CURRENT_DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+

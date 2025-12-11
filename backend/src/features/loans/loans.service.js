@@ -91,6 +91,7 @@ const addGuarantor = async (userId, loanId, guarantorId) => {
 };
 
 const respondToGuarantorRequest = async (userId, requestId, decision) => {
+    // Basic accept logic
     const check = await db.query("SELECT loan_application_id FROM loan_guarantors WHERE id=$1 AND guarantor_id=$2", [requestId, userId]);
     if (check.rows.length === 0) throw new Error("Unauthorized request");
 
@@ -171,8 +172,7 @@ const disburseLoan = async (treasurerId, loanId) => {
     }
 };
 
-// --- 4. LISTING HELPERS (GETTERS) ---
-// These were missing in your previous file!
+// --- 4. LISTING HELPERS (MISSING FUNCTIONS ADDED HERE) ---
 
 const getOfficerQueue = async () => {
     const res = await db.query(`SELECT l.*, u.full_name FROM loan_applications l JOIN users u ON l.user_id = u.id WHERE l.status IN ('SUBMITTED', 'PENDING_GUARANTORS')`);

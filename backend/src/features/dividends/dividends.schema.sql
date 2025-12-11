@@ -19,5 +19,6 @@ CREATE TABLE IF NOT EXISTS dividend_allocations (
     status VARCHAR(20) DEFAULT 'PENDING',
     payment_method VARCHAR(50),
     transaction_id INTEGER REFERENCES transactions(id),
+    payment_date DATE, -- ✅ Added this
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

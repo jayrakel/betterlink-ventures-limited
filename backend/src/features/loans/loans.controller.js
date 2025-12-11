@@ -86,7 +86,7 @@ const disburse = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-// --- DATA ACCESSORS (These were missing) ---
+// --- DATA ACCESSORS (MISSING FUNCTIONS ADDED HERE) ---
 
 const getGuarantorRequests = async (req, res) => {
     try {
