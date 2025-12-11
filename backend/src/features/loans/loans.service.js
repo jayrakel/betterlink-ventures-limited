@@ -33,7 +33,7 @@ const getMemberLoanStatus = async (userId) => {
 
     if (result.rows.length === 0) return { status: 'NO_APP', eligibility };
     
-    // --- 🟢 RESTORED SCHEDULE LOGIC STARTS HERE 🟢 ---
+    // --- SCHEDULE LOGIC ---
     const loan = result.rows[0];
 
     // Ensure numbers are parsed safely
@@ -43,14 +43,15 @@ const getMemberLoanStatus = async (userId) => {
     loan.interest_amount = parseFloat(loan.interest_amount || 0);
     loan.repayment_weeks = parseInt(loan.repayment_weeks || 0);
 
-    // Default Schedule Object (Prevents Frontend Crashes)
+    // Default Schedule Object
     loan.schedule = {
         weekly_installment: 0,
         weeks_passed: 0,
         installments_due: 0,
         expected_to_date: 0,
         running_balance: 0,
-        status_text: 'Pending'
+        status_text: 'Pending',
+        grace_days_remaining: 0 // ✅ NEW FIELD
     };
 
     // Calculate Weekly Schedule Only if Active & Disbursed
@@ -61,13 +62,24 @@ const getMemberLoanStatus = async (userId) => {
         const now = new Date();
         const start = new Date(loan.disbursed_at);
         const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+        const oneDayMs = 24 * 60 * 60 * 1000;
         
-        // Flat Rate Calculation: Total / Weeks
-        const weeklyAmount = loan.total_due / loan.repayment_weeks;
+        // Prevent Division by Zero
+        const weeks = loan.repayment_weeks > 0 ? loan.repayment_weeks : 1;
+        const weeklyAmount = loan.total_due / weeks;
         
         const diffMs = now - start;
         const rawWeeksPassed = Math.floor(diffMs / oneWeekMs);
         const effectiveWeeksPassed = rawWeeksPassed - graceWeeks;
+
+        // ✅ NEW: Calculate Exact Grace Days Remaining
+        let graceDaysRemaining = 0;
+        if (effectiveWeeksPassed < 0) {
+            // Calculate date when grace period ends
+            const graceEndDate = new Date(start.getTime() + (graceWeeks * oneWeekMs));
+            const remainingMs = graceEndDate - now;
+            graceDaysRemaining = Math.max(0, Math.ceil(remainingMs / oneDayMs));
+        }
 
         let installmentsDue = 0;
         let statusText = 'ON TRACK';
@@ -94,10 +106,10 @@ const getMemberLoanStatus = async (userId) => {
             weeks_remaining: Math.max(0, loan.repayment_weeks - (effectiveWeeksPassed + 1)),
             expected_to_date: parseFloat(amountExpectedSoFar.toFixed(2)),
             running_balance: parseFloat(runningBalance.toFixed(2)),
-            status_text: statusText
+            status_text: statusText,
+            grace_days_remaining: graceDaysRemaining // ✅ SEND TO FRONTEND
         };
     }
-    // --- 🔴 RESTORED LOGIC ENDS HERE 🔴 ---
 
     return { ...loan, eligibility };
 };

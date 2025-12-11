@@ -1,7 +1,6 @@
-import api from '../../../api'; // Ensure this points to your existing axios instance
+import api from '../../../api';
 
 export const loginUser = async (credentials) => {
-    // credentials = { email, password }
     const { data } = await api.post('/api/auth/login', credentials);
     return data;
 };
@@ -17,4 +16,15 @@ export const logoutUser = async () => {
     } catch (error) {
         console.error("Logout failed", error);
     }
+};
+
+export const fetchUserProfile = async () => {
+    const { data } = await api.get('/api/auth/profile');
+    return data;
+};
+
+// ✅ MAKE SURE THIS IS HERE AND EXPORTED
+export const changePassword = async (passwords) => {
+    const { data } = await api.post('/api/auth/change-password', passwords);
+    return data;
 };

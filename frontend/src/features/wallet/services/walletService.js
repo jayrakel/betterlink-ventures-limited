@@ -10,20 +10,28 @@ export const fetchTransactions = async () => {
     return data;
 };
 
-export const initiateDeposit = async (amount, phone) => {
+// Handle M-Pesa STK Push
+export const initiateDeposit = async (amount, phone, type) => {
     const { data } = await api.post('/api/payments/mpesa/stk-push', { 
         amount, 
         phoneNumber: phone,
-        type: 'DEPOSIT' 
+        type // e.g. DEPOSIT, SHARE_CAPITAL
     });
+    return data;
+};
+
+// ✅ NEW: Handle Manual Payments (Bank/PayPal/M-Pesa Manual)
+export const recordManualPayment = async (payload) => {
+    // payload = { amount, reference, type, method, bankName }
+    // We map this to the backend's manual recording endpoint
+    const { data } = await api.post('/api/payments/manual', payload);
     return data;
 };
 
 export const downloadStatement = async () => {
     const response = await api.get('/api/reports/statement/me', {
-        responseType: 'blob', // Important for PDF
+        responseType: 'blob',
     });
-    // Create a link to download the blob
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;

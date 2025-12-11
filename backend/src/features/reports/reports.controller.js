@@ -5,6 +5,8 @@ const QRCode = require('qrcode');
 // --- HELPER: DRAW HEADER ---
 async function drawHeader(doc, title, user, details, serialNo) {
     const now = new Date();
+    
+    // 1. Draw Sacco Logo (Top Left)
     if (details.logo && details.logo.startsWith('data:image')) {
         try {
             const imgData = details.logo.split(',')[1];
@@ -12,34 +14,60 @@ async function drawHeader(doc, title, user, details, serialNo) {
             doc.image(imgBuffer, 50, 45, { width: 60 });
         } catch (e) { console.error("Logo Error:", e); }
     }
+
+    // 2. Draw Sacco Text Details (Top Right)
     doc.font('Helvetica-Bold').fontSize(16).text(details.name, 200, 50, { align: 'right' });
     doc.font('Helvetica').fontSize(9).text(details.address, 200, 70, { align: 'right' });
     doc.text(`Tel: ${details.phone} | Email: ${details.email}`, 200, 85, { align: 'right' });
+    
     doc.moveDown();
     doc.moveTo(50, 110).lineTo(550, 110).strokeColor('#aaaaaa').stroke();
     doc.font('Helvetica-Bold').fontSize(14).fillColor('#333333').text(title.toUpperCase(), 50, 120, { align: 'center', characterSpacing: 1 });
     
-    const topY = 150;
-    doc.fontSize(10).fillColor('black');
-    doc.font('Helvetica-Bold').text('GENERATED FOR:', 50, topY);
-    doc.font('Helvetica').text(user.full_name.toUpperCase(), 50, topY + 15);
-    doc.text(`Role: ${user.role}`, 50, topY + 30);
-    doc.text(`ID: ${user.id_number || 'Internal'}`, 50, topY + 45);
+    const topY = 160;
 
+    // 3. Draw User Profile Picture (If available)
+    if (user.profile_image && user.profile_image.startsWith('data:image')) {
+        try {
+            const profileData = user.profile_image.split(',')[1];
+            const profileBuffer = Buffer.from(profileData, 'base64');
+            // Draw circular clipping path
+            doc.save();
+            doc.circle(80, topY + 25, 25).clip();
+            doc.image(profileBuffer, 55, topY, { width: 50, height: 50 });
+            doc.restore();
+        } catch (e) { 
+            // Fallback circle if image fails
+            doc.circle(80, topY + 25, 25).fillColor('#eeeeee').fill();
+        }
+    }
+
+    // Draw User Details (Shifted slightly right to accommodate photo)
+    const textX = user.profile_image ? 120 : 50;
+    
+    doc.fontSize(10).fillColor('black');
+    doc.font('Helvetica-Bold').text('GENERATED FOR:', textX, topY);
+    doc.font('Helvetica').text(user.full_name.toUpperCase(), textX, topY + 15);
+    doc.text(`Role: ${user.role}`, textX, topY + 30);
+    doc.text(`ID: ${user.id_number || 'Internal'}`, textX, topY + 45);
+
+    // Document Meta
     doc.fillColor('black');
     doc.font('Helvetica-Bold').text('DOCUMENT DETAILS:', 350, topY);
     doc.font('Helvetica').text(`Date: ${now.toLocaleDateString()}`, 350, topY + 15);
     doc.text(`Time: ${now.toLocaleTimeString()}`, 350, topY + 30);
     doc.text(`Ref: ${serialNo}`, 350, topY + 45);
 
+    // QR Code
     const qrString = `SACCO AUTH | ${details.name} | ${serialNo} | ${user.full_name} | ${now.toISOString()}`;
     const qrData = await QRCode.toDataURL(qrString);
     const qrBuffer = Buffer.from(qrData.split(',')[1], 'base64');
     doc.image(qrBuffer, 480, topY - 10, { width: 70 });
 
     doc.moveDown(4);
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveTo(50, 240).lineTo(550, 240).stroke(); // Adjusted line position
     doc.moveDown(0.5);
+    doc.y = 260; // Reset Y for body content
 }
 
 // --- CONTROLLERS ---
@@ -176,7 +204,6 @@ const downloadMasterLedger = async (req, res) => {
 
         await drawHeader(doc, 'Master Financial Ledger', req.user, sacco, serialNo);
         // ... (PDF Drawing Logic similar to above but for Admin) ...
-        // Simplified for brevity in this refactor response, reusing pattern
         doc.fontSize(12).text('Financial Position Summary', 50, doc.y + 20);
         doc.fontSize(10).text(`Total Assets: KES ${(netSavings + totalRevenue).toLocaleString()}`);
         doc.text(`Liquid Cash: KES ${cashOnHand.toLocaleString()}`);

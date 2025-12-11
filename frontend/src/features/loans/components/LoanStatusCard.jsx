@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreditCard, AlertCircle, CheckCircle, Lock } from 'lucide-react';
+import { CreditCard, AlertCircle, CheckCircle, Lock, Clock, Calendar } from 'lucide-react';
 
 export default function LoanStatusCard({ loan, onApply }) {
     // 1. Handle No Active Application (Show Eligibility)
@@ -30,7 +30,7 @@ export default function LoanStatusCard({ loan, onApply }) {
         );
     }
 
-    // 2. Handle Active/Pending Application (Existing logic)
+    // 2. Handle Active/Pending Application
     const isActive = loan.status === 'ACTIVE';
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
@@ -66,6 +66,14 @@ export default function LoanStatusCard({ loan, onApply }) {
                         <div className="text-slate-500">Weekly Due: <span className="font-bold text-slate-800">KES {loan.schedule.weekly_installment?.toLocaleString()}</span></div>
                         <div className={`font-bold uppercase ${loan.schedule.status_text === 'IN ARREARS' ? 'text-red-500' : 'text-emerald-500'}`}>{loan.schedule.status_text}</div>
                     </div>
+
+                    {/* ✅ NEW: Grace Period Countdown Widget */}
+                    {loan.schedule.status_text === 'GRACE PERIOD' && (
+                        <div className="mt-3 flex items-center gap-2 p-2 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-100 animate-pulse">
+                            <Clock size={16} />
+                            <span>{loan.schedule.grace_days_remaining} days left in grace period</span>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

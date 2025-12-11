@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     RefreshCw, Download, PlusCircle, User, FileText, 
-    CreditCard, Landmark, AlertCircle 
+    CreditCard, Landmark, AlertCircle, CheckCircle, AlertTriangle 
 } from 'lucide-react';
 
 // Components
@@ -11,10 +11,10 @@ import BalanceCard from '../features/wallet/components/BalanceCard';
 import TransactionList from '../features/wallet/components/TransactionList';
 import DepositModal from '../features/wallet/components/DepositModal';
 import PaymentChannelsModal from '../features/wallet/components/PaymentChannelsModal';
-import ProfileModal from '../features/auth/components/ProfileModal'; // Uses the full version I sent earlier
+import ProfileModal from '../features/auth/components/ProfileModal';
 import LoanStatusCard from '../features/loans/components/LoanStatusCard';
 import GuarantorManager from '../features/loans/components/GuarantorManager';
-import VotingQueue from '../features/loans/components/VotingQueue'; // ✅ NEW: Voting Feature
+import VotingQueue from '../features/loans/components/VotingQueue';
 
 // Hooks & Services
 import { useWallet } from '../features/wallet/hooks/useWallet';
@@ -23,18 +23,17 @@ import { downloadStatement } from '../features/wallet/services/walletService';
 import { initApplication, submitApplication } from '../features/loans/services/loanService';
 
 export default function MemberDashboard({ user, onLogout }) {
+    // --- STATE ---
     const [showBalance, setShowBalance] = useState(false);
-    
-    // Modals
     const [isDepositOpen, setDepositOpen] = useState(false);
     const [isChannelsOpen, setChannelsOpen] = useState(false);
     const [isProfileOpen, setProfileOpen] = useState(false);
 
-    // Data Hooks
-    const { balance, transactions, loading: walletLoading, refreshWallet } = useWallet(user?.id);
+    // --- DATA HOOKS ---
+    const { balance, transactions, weeklyStats, loading: walletLoading, refreshWallet } = useWallet(user?.id);
     const { loan, loading: loanLoading, refreshLoans } = useLoans(user?.id);
 
-    // Handlers
+    // --- HANDLERS ---
     const handleRefresh = () => {
         refreshWallet();
         refreshLoans();
@@ -77,7 +76,7 @@ export default function MemberDashboard({ user, onLogout }) {
                         <p className="text-slate-500">Your financial overview.</p>
                     </div>
                     
-                    {/* ✅ REFRESH ICON BUTTON */}
+                    {/* Refresh Icon Button */}
                     <button onClick={handleRefresh} className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-indigo-600 transition shadow-sm group">
                         <RefreshCw size={20} className="group-hover:rotate-180 transition-transform duration-500" />
                     </button>
@@ -88,10 +87,35 @@ export default function MemberDashboard({ user, onLogout }) {
                     
                     {/* LEFT COLUMN: WALLET & ACTIONS */}
                     <div className="lg:col-span-2 space-y-8">
-                        {/* Balance */}
+                        {/* Balance Card */}
                         <BalanceCard balance={balance.savings} shares={balance.shares} showBalance={showBalance} onToggleBalance={() => setShowBalance(!showBalance)}/>
 
-                        {/* ✅ VOTING QUEUE (Restored) */}
+                        {/* Weekly Goal Widget */}
+                        <div className={`p-5 rounded-2xl border flex items-center justify-between shadow-sm transition ${weeklyStats?.isComplete ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-200'}`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`p-3 rounded-full ${weeklyStats?.isComplete ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                    {weeklyStats?.isComplete ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold uppercase text-slate-400 tracking-wider">Weekly Goal</p>
+                                    <p className="text-slate-800 font-bold text-lg">
+                                        KES {weeklyStats?.total?.toLocaleString()} <span className="text-slate-400 text-sm">/ {weeklyStats?.goal?.toLocaleString()}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            {weeklyStats?.isComplete ? (
+                                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">Completed</span>
+                            ) : (
+                                <div className="text-right">
+                                    <p className="text-xs text-amber-600 font-bold mb-1">KES {(weeklyStats?.goal - weeklyStats?.total)?.toLocaleString()} remaining</p>
+                                    <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min((weeklyStats?.total / weeklyStats?.goal) * 100, 100)}%` }}></div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Voting Queue */}
                         <VotingQueue />
 
                         {/* Action Buttons */}
@@ -153,7 +177,7 @@ export default function MemberDashboard({ user, onLogout }) {
                 isOpen={isDepositOpen} 
                 onClose={() => setDepositOpen(false)} 
                 userPhone={user?.phone_number} 
-                activeLoan={loan} // Pass loan for auto-fill logic
+                activeLoan={loan} 
             />
             <PaymentChannelsModal isOpen={isChannelsOpen} onClose={() => setChannelsOpen(false)} />
             <ProfileModal isOpen={isProfileOpen} onClose={() => setProfileOpen(false)} user={user} />
