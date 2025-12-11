@@ -86,10 +86,72 @@ const disburse = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+// --- DATA ACCESSORS (These were missing) ---
+
+const getGuarantorRequests = async (req, res) => {
+    try {
+        const list = await loanService.getGuarantorRequests(req.user.id);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+const searchMembers = async (req, res) => {
+    try {
+        const list = await loanService.searchMembers(req.user.id, req.query.q);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+const getMyGuarantors = async (req, res) => {
+    try {
+        const list = await loanService.getMyGuarantors(req.user.id);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+const getOpenVotes = async (req, res) => {
+    try {
+        const list = await loanService.getOpenVotes(req.user.id);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+const getChairAgenda = async (req, res) => {
+    try {
+        const list = await loanService.getChairAgenda();
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+const getLiveTally = async (req, res) => {
+    try {
+        const list = await loanService.getLiveTally();
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+const announceMeeting = async (req, res) => {
+    try {
+        await loanService.announceMeeting(req.body.meetingDate, req.body.extraAgendas);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+const getTreasuryStats = async (req, res) => {
+    try {
+        const stats = await loanService.getTreasuryStats();
+        res.json(stats);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
 module.exports = {
     getMyStatus, initApp, submitApp, addGuarantor, respondGuarantor, castVote,
     officerList, verifyLoan,
     secretaryList, tableLoan, secretaryFinalize,
     chairOpenVote,
-    treasuryList, disburse
+    treasuryList, disburse,
+    // Exporting the missing controllers
+    getGuarantorRequests, searchMembers, getMyGuarantors,
+    getOpenVotes, getChairAgenda, getLiveTally, announceMeeting,
+    getTreasuryStats
 };

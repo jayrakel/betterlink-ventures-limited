@@ -9,7 +9,10 @@ require('dotenv').config();
 // Config
 const db = require('./src/config/db');
 
-// Features
+// Middleware Import (Fixes your error)
+const { authenticateUser } = require('./src/features/auth/auth.middleware');
+
+// Feature Routes
 const authRoutes = require('./src/features/auth/auth.routes');
 const memberRoutes = require('./src/features/members/members.routes');
 const settingsRoutes = require('./src/features/settings/settings.routes');
@@ -53,19 +56,21 @@ const apiLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 200 });
 
 // --- ROUTES MOUNTING ---
 app.use('/api/auth', loginLimiter, authRoutes);
-app.use('/api/auth', apiLimiter, memberRoutes); // Profile routes
+app.use('/api/auth', apiLimiter, memberRoutes); // Profile routes (kept under /auth for frontend compatibility)
 app.use('/api/settings', settingsRoutes);
 app.use('/api/loan', apiLimiter, loanRoutes);
 app.use('/api/deposits', apiLimiter, depositRoutes);
 app.use('/api/payments', apiLimiter, paymentRoutes);
 app.use('/api/dividends', apiLimiter, dividendRoutes);
 app.use('/api/reports', apiLimiter, reportRoutes);
-app.use('/api/advanced-reports', apiLimiter, reportRoutes); // Alias for compatibility
+app.use('/api/advanced-reports', apiLimiter, reportRoutes); // Alias for legacy support
 app.use('/api/cms', apiLimiter, cmsRoutes);
 app.use('/api/management', apiLimiter, assetRoutes); // Assets & Expenses
 app.use('/api/fines', apiLimiter, finesRoutes);
+
+// Notifications (Protected)
 app.use('/api/notifications', authenticateUser, notificationRoutes); 
-app.use('/api/loan/notifications', authenticateUser, notificationRoutes);
+app.use('/api/loan/notifications', authenticateUser, notificationRoutes); // Legacy support
 
 app.use((err, req, res, next) => {
     console.error(err.stack);

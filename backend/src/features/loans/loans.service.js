@@ -1,6 +1,5 @@
 const db = require('../../config/db');
 const { notifyUser, notifyAll } = require('../../shared/notify');
-// We import getSetting from the new settings service we created in Phase 2
 const { getSetting } = require('../settings/settings.service');
 
 // --- 1. APPLICATION LOGIC ---
@@ -92,7 +91,6 @@ const addGuarantor = async (userId, loanId, guarantorId) => {
 };
 
 const respondToGuarantorRequest = async (userId, requestId, decision) => {
-    // Basic accept logic (Complex liability checks can be added here if needed)
     const check = await db.query("SELECT loan_application_id FROM loan_guarantors WHERE id=$1 AND guarantor_id=$2", [requestId, userId]);
     if (check.rows.length === 0) throw new Error("Unauthorized request");
 
@@ -106,7 +104,7 @@ const respondToGuarantorRequest = async (userId, requestId, decision) => {
     );
 };
 
-// --- 3. WORKFLOW ACTIONS (Officer, Secretary, Chair, Treasurer) ---
+// --- 3. WORKFLOW ACTIONS ---
 
 const verifyApplication = async (loanId) => {
     await db.query("UPDATE loan_applications SET status='VERIFIED' WHERE id=$1", [loanId]);
@@ -173,7 +171,9 @@ const disburseLoan = async (treasurerId, loanId) => {
     }
 };
 
-// --- LISTING HELPERS ---
+// --- 4. LISTING HELPERS (GETTERS) ---
+// These were missing in your previous file!
+
 const getOfficerQueue = async () => {
     const res = await db.query(`SELECT l.*, u.full_name FROM loan_applications l JOIN users u ON l.user_id = u.id WHERE l.status IN ('SUBMITTED', 'PENDING_GUARANTORS')`);
     return res.rows;
@@ -189,10 +189,97 @@ const getTreasuryQueue = async () => {
     return res.rows;
 };
 
+const getGuarantorRequests = async (userId) => {
+    const result = await db.query(
+        `SELECT g.id, u.full_name as applicant_name, l.amount_requested 
+         FROM loan_guarantors g
+         JOIN loan_applications l ON g.loan_application_id = l.id
+         JOIN users u ON l.user_id = u.id
+         WHERE g.guarantor_id = $1 AND g.status = 'PENDING'`,
+        [userId]
+    );
+    return result.rows;
+};
+
+const searchMembers = async (userId, query) => {
+    const result = await db.query(
+        `SELECT id, full_name, phone_number FROM users 
+         WHERE id != $1 AND (full_name ILIKE $2 OR phone_number ILIKE $2) LIMIT 5`,
+        [userId, `%${query}%`]
+    );
+    return result.rows;
+};
+
+const getMyGuarantors = async (userId) => {
+    const loan = await db.query("SELECT id FROM loan_applications WHERE user_id = $1 AND status IN ('PENDING_GUARANTORS')", [userId]);
+    if (loan.rows.length === 0) return [];
+    
+    const result = await db.query(
+        `SELECT g.id, u.full_name, g.status 
+         FROM loan_guarantors g 
+         JOIN users u ON g.guarantor_id = u.id 
+         WHERE g.loan_application_id = $1`,
+        [loan.rows[0].id]
+    );
+    return result.rows;
+};
+
+const getOpenVotes = async (userId) => {
+    const result = await db.query(
+        `SELECT l.id, l.amount_requested, u.full_name, l.purpose 
+         FROM loan_applications l
+         JOIN users u ON l.user_id = u.id
+         WHERE l.status = 'VOTING' AND l.user_id != $1
+         AND NOT EXISTS (SELECT 1 FROM votes v WHERE v.loan_application_id = l.id AND v.user_id = $1)`,
+        [userId]
+    );
+    return result.rows;
+};
+
+const getChairAgenda = async () => {
+    const result = await db.query(
+        `SELECT l.id, l.amount_requested, u.full_name, l.purpose 
+         FROM loan_applications l
+         JOIN users u ON l.user_id = u.id
+         WHERE l.status = 'TABLED' 
+         ORDER BY l.created_at ASC`
+    );
+    return result.rows;
+};
+
+const getLiveTally = async () => {
+    const result = await db.query(
+        `SELECT l.id, u.full_name, l.amount_requested, l.status,
+         COUNT(CASE WHEN v.vote = 'YES' THEN 1 END) as yes_votes,
+         COUNT(CASE WHEN v.vote = 'NO' THEN 1 END) as no_votes
+         FROM loan_applications l
+         JOIN users u ON l.user_id = u.id
+         LEFT JOIN votes v ON l.id = v.loan_application_id
+         WHERE l.status IN ('TABLED', 'VOTING')
+         GROUP BY l.id, u.full_name, l.amount_requested, l.status`
+    );
+    return result.rows;
+};
+
+const announceMeeting = async (meetingDate, extraAgendas) => {
+    await notifyAll(`📅 MEETING CALL: ${meetingDate || "Next Thursday"}. Agenda: ${extraAgendas}`);
+};
+
+const getTreasuryStats = async () => {
+    const stats = await db.query(`SELECT (SELECT COALESCE(SUM(amount), 0) FROM deposits WHERE status='COMPLETED') as savings, (SELECT COUNT(*) * 500 FROM loan_applications WHERE status != 'FEE_PENDING') as fees, (SELECT COALESCE(SUM(amount_repaid), 0) FROM loan_applications) as repaid, (SELECT COALESCE(SUM(amount_requested), 0) FROM loan_applications WHERE status IN ('ACTIVE', 'COMPLETED')) as disbursed`);
+    const r = stats.rows[0];
+    const liquid = (parseFloat(r.savings) + parseFloat(r.fees) + parseFloat(r.repaid)) - parseFloat(r.disbursed);
+    return { availableFunds: liquid, totalDisbursed: parseFloat(r.disbursed) };
+};
+
 module.exports = {
     getMemberLoanStatus, initApplication, submitApplicationDetails,
     addGuarantor, respondToGuarantorRequest,
     verifyApplication, tableApplication, openVoting, castVote, finalizeVote,
     disburseLoan,
-    getOfficerQueue, getSecretaryQueue, getTreasuryQueue
+    // Exporting the missing getters
+    getOfficerQueue, getSecretaryQueue, getTreasuryQueue,
+    getGuarantorRequests, searchMembers, getMyGuarantors,
+    getOpenVotes, getChairAgenda, getLiveTally, announceMeeting,
+    getTreasuryStats
 };

@@ -32,4 +32,18 @@ const deleteCategory = async (id) => {
     await db.query("UPDATE contribution_categories SET is_active = FALSE WHERE id = $1", [id]);
 };
 
-module.exports = { getAllSettings, getBranding, updateSetting, getCategories, createCategory, deleteCategory };
+// ✅ ADDED THIS MISSING HELPER
+const getSetting = async (key) => {
+    const res = await db.query("SELECT setting_value FROM system_settings WHERE setting_key = $1", [key]);
+    return res.rows.length > 0 ? res.rows[0].setting_value : null;
+};
+
+module.exports = { 
+    getAllSettings, 
+    getBranding, 
+    updateSetting, 
+    getCategories, 
+    createCategory, 
+    deleteCategory,
+    getSetting // ✅ Exported here
+};

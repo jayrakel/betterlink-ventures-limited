@@ -1,5 +1,4 @@
-// backend/init_db.js
-const { pool } = require('./db');
+const { pool } = require('./src/config/db');
 const fs = require('fs');
 const path = require('path');
 
@@ -8,14 +7,21 @@ async function init() {
     try {
         console.log("⏳ Beginning Database Migration...");
         
-        // List your schema files here in order
+        // List your schema files in order of dependency
+        // (e.g., users table must exist before transactions table)
         const schemaFiles = [
-            'modules/auth/schema.sql',
-            'modules/loans/schema.sql',
-            'modules/payments/schema.sql',
-            'modules/deposits/schema.sql',
-            'modules/settings/schema.sql',
-            'modules/notifications/schema.sql'
+            'src/features/auth/auth.schema.sql',
+            'src/features/members/members.schema.sql',
+            'src/features/settings/settings.schema.sql',
+            'src/features/payments/payments.schema.sql',
+            'src/features/deposits/deposits.schema.sql',
+            'src/features/loans/loans.schema.sql',
+            'src/features/fines/fines.schema.sql',
+            'src/features/notifications/notifications.schema.sql',
+            'src/features/dividends/dividends.schema.sql',
+            'src/features/reports/reports.schema.sql',
+            'src/features/cms/cms.schema.sql',
+            'src/features/assets/assets.schema.sql'
         ];
 
         for (const file of schemaFiles) {
@@ -24,9 +30,11 @@ async function init() {
                 const sql = fs.readFileSync(filePath, 'utf8');
                 await client.query(sql);
                 console.log(`✅ Executed: ${file}`);
+            } else {
+                console.warn(`⚠️  Warning: Schema file not found: ${file}`);
             }
         }
-        console.log("🚀 Database is ready for Client Testing!");
+        console.log("🚀 Database is ready for Production!");
     } catch (err) {
         console.error("❌ Migration Failed:", err);
     } finally {
