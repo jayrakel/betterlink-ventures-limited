@@ -33,7 +33,73 @@ const getMemberLoanStatus = async (userId) => {
 
     if (result.rows.length === 0) return { status: 'NO_APP', eligibility };
     
-    return { ...result.rows[0], eligibility };
+    // --- 🟢 RESTORED SCHEDULE LOGIC STARTS HERE 🟢 ---
+    const loan = result.rows[0];
+
+    // Ensure numbers are parsed safely
+    loan.amount_requested = parseFloat(loan.amount_requested || 0);
+    loan.amount_repaid = parseFloat(loan.amount_repaid || 0);
+    loan.total_due = parseFloat(loan.total_due || 0);
+    loan.interest_amount = parseFloat(loan.interest_amount || 0);
+    loan.repayment_weeks = parseInt(loan.repayment_weeks || 0);
+
+    // Default Schedule Object (Prevents Frontend Crashes)
+    loan.schedule = {
+        weekly_installment: 0,
+        weeks_passed: 0,
+        installments_due: 0,
+        expected_to_date: 0,
+        running_balance: 0,
+        status_text: 'Pending'
+    };
+
+    // Calculate Weekly Schedule Only if Active & Disbursed
+    if (loan.status === 'ACTIVE' && loan.disbursed_at && loan.total_due > 0) {
+        const graceVal = await getSetting('loan_grace_period_weeks');
+        const graceWeeks = parseInt(graceVal) || 4; 
+
+        const now = new Date();
+        const start = new Date(loan.disbursed_at);
+        const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+        
+        // Flat Rate Calculation: Total / Weeks
+        const weeklyAmount = loan.total_due / loan.repayment_weeks;
+        
+        const diffMs = now - start;
+        const rawWeeksPassed = Math.floor(diffMs / oneWeekMs);
+        const effectiveWeeksPassed = rawWeeksPassed - graceWeeks;
+
+        let installmentsDue = 0;
+        let statusText = 'ON TRACK';
+
+        if (effectiveWeeksPassed < 0) {
+            installmentsDue = 0;
+            statusText = 'GRACE PERIOD';
+        } else {
+            installmentsDue = Math.min(effectiveWeeksPassed + 1, loan.repayment_weeks);
+        }
+        
+        const amountExpectedSoFar = installmentsDue * weeklyAmount;
+        const runningBalance = loan.amount_repaid - amountExpectedSoFar;
+
+        if (statusText !== 'GRACE PERIOD') {
+            if (runningBalance < -100) statusText = 'IN ARREARS';
+            else if (runningBalance > 100) statusText = 'AHEAD OF SCHEDULE';
+            else statusText = 'ON TRACK';
+        }
+
+        loan.schedule = {
+            weekly_installment: parseFloat(weeklyAmount.toFixed(2)),
+            weeks_passed: Math.max(0, effectiveWeeksPassed + 1),
+            weeks_remaining: Math.max(0, loan.repayment_weeks - (effectiveWeeksPassed + 1)),
+            expected_to_date: parseFloat(amountExpectedSoFar.toFixed(2)),
+            running_balance: parseFloat(runningBalance.toFixed(2)),
+            status_text: statusText
+        };
+    }
+    // --- 🔴 RESTORED LOGIC ENDS HERE 🔴 ---
+
+    return { ...loan, eligibility };
 };
 
 const initApplication = async (userId) => {
@@ -172,7 +238,7 @@ const disburseLoan = async (treasurerId, loanId) => {
     }
 };
 
-// --- 4. LISTING HELPERS (MISSING FUNCTIONS ADDED HERE) ---
+// --- 4. LISTING HELPERS ---
 
 const getOfficerQueue = async () => {
     const res = await db.query(`SELECT l.*, u.full_name FROM loan_applications l JOIN users u ON l.user_id = u.id WHERE l.status IN ('SUBMITTED', 'PENDING_GUARANTORS')`);
@@ -277,7 +343,6 @@ module.exports = {
     addGuarantor, respondToGuarantorRequest,
     verifyApplication, tableApplication, openVoting, castVote, finalizeVote,
     disburseLoan,
-    // Exporting the missing getters
     getOfficerQueue, getSecretaryQueue, getTreasuryQueue,
     getGuarantorRequests, searchMembers, getMyGuarantors,
     getOpenVotes, getChairAgenda, getLiveTally, announceMeeting,

@@ -2,13 +2,10 @@ const { pool } = require('./src/config/db');
 const fs = require('fs');
 const path = require('path');
 
-async function init() {
+// Wrap logic in an exported function
+const init = async () => {
     const client = await pool.connect();
     try {
-        console.log("⏳ Beginning Database Migration...");
-        
-        // List your schema files in order of dependency
-        // (e.g., users table must exist before transactions table)
         const schemaFiles = [
             'src/features/auth/auth.schema.sql',
             'src/features/members/members.schema.sql',
@@ -29,18 +26,25 @@ async function init() {
             if (fs.existsSync(filePath)) {
                 const sql = fs.readFileSync(filePath, 'utf8');
                 await client.query(sql);
-                console.log(`✅ Executed: ${file}`);
+                // console.log(`✅ Executed: ${file}`); // Optional: Comment out to reduce noise
             } else {
                 console.warn(`⚠️  Warning: Schema file not found: ${file}`);
             }
         }
-        console.log("🚀 Database is ready for Production!");
     } catch (err) {
         console.error("❌ Migration Failed:", err);
+        throw err; // Re-throw so index.js knows it failed
     } finally {
         client.release();
-        pool.end();
     }
+};
+
+// Allow running manually via `node init_db.js` OR importing
+if (require.main === module) {
+    init().then(() => {
+        console.log("🚀 Manual Migration Complete!");
+        pool.end();
+    });
 }
 
-init();
+module.exports = { init };
