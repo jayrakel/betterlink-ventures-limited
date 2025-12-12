@@ -35,7 +35,8 @@ export default function LoanStatusCard({ loan, onApply }) {
 
     // Top Up Logic
     const canTopUp = loan.eligibility?.can_top_up;
-    const availableTopUp = loan.eligibility?.available_limit;
+    // ✅ FIX: Define 'availableLimit' correctly so it matches usage below
+    const availableLimit = loan.eligibility?.available_limit || 0;
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
@@ -110,10 +111,10 @@ export default function LoanStatusCard({ loan, onApply }) {
                     <div className="flex justify-between items-center text-xs bg-slate-50 p-2 rounded-lg">
                         <div className="text-slate-500">Weekly Due: <span className="font-bold text-slate-800">KES {schedule.weekly_installment?.toLocaleString()}</span></div>
                         
-                        {/* ✅ NEW: TOP UP BUTTON */}
+                        {/* ✅ FIX: Top Up Button now uses the correct variable */}
                         {canTopUp && (
-                            <button onClick={onApply} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
-                                <PlusCircle size={12}/> Top Up (Limit: {availableLimit.toLocaleString()})
+                            <button onClick={onApply} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition">
+                                <PlusCircle size={12}/> Top Up (Limit: {Math.floor(availableLimit).toLocaleString()})
                             </button>
                         )}
                     </div>
