@@ -72,32 +72,50 @@ const getMemberLoanStatus = async (userId) => {
         const rawWeeksPassed = Math.floor(diffMs / oneWeekMs);
         const effectiveWeeksPassed = rawWeeksPassed - graceWeeks;
 
-        // ✅ NEW: Calculate Exact Grace Days Remaining
-        let graceDaysRemaining = 0;
-        if (effectiveWeeksPassed < 0) {
-            // Calculate date when grace period ends
-            const graceEndDate = new Date(start.getTime() + (graceWeeks * oneWeekMs));
-            const remainingMs = graceEndDate - now;
-            graceDaysRemaining = Math.max(0, Math.ceil(remainingMs / oneDayMs));
-        }
-
+        // 1. Calculate Expected Amount
         let installmentsDue = 0;
-        let statusText = 'ON TRACK';
-
+        
         if (effectiveWeeksPassed < 0) {
-            installmentsDue = 0;
-            statusText = 'GRACE PERIOD';
+            // In Grace Period: Nothing is strictly "due" yet
+            installmentsDue = 0; 
         } else {
+            // Grace Period Over: Count weeks passed since grace ended
+            // Cap at repayment_weeks (can't owe more than total loan)
             installmentsDue = Math.min(effectiveWeeksPassed + 1, loan.repayment_weeks);
         }
         
         const amountExpectedSoFar = installmentsDue * weeklyAmount;
+        
+        // 2. Calculate Strict Running Balance
+        // Positive = Prepayment (Paid more than expected)
+        // Negative = Arrears (Paid less than expected)
         const runningBalance = loan.amount_repaid - amountExpectedSoFar;
 
-        if (statusText !== 'GRACE PERIOD') {
-            if (runningBalance < -100) statusText = 'IN ARREARS';
-            else if (runningBalance > 100) statusText = 'AHEAD OF SCHEDULE';
-            else statusText = 'ON TRACK';
+        // 3. Determine Status (Strict)
+        let statusText = '';
+        let graceDaysRemaining = 0;
+
+        if (runningBalance < 0) {
+            // STRICT: Even -1 is Arrears
+            statusText = 'ARREARS'; 
+        } else if (runningBalance > 0) {
+            // STRICT: Even +1 is Prepayment (Includes payments made during Grace Period)
+            statusText = 'PREPAYMENT'; 
+        } else {
+            // Exactly 0 Balance
+            if (effectiveWeeksPassed < 0) {
+                statusText = 'GRACE PERIOD'; // Only show this if they haven't paid anything extra
+            } else {
+                statusText = 'UP TO DATE'; // Replaced "On Track" with strict "Up to Date"
+            }
+        }
+
+        // Calculate Grace Countdown (Visual Helper)
+        if (effectiveWeeksPassed < 0) {
+            const oneDayMs = 24 * 60 * 60 * 1000;
+            const graceEndDate = new Date(start.getTime() + (graceWeeks * oneWeekMs));
+            const remainingMs = graceEndDate - now;
+            graceDaysRemaining = Math.max(0, Math.ceil(remainingMs / oneDayMs));
         }
 
         loan.schedule = {
@@ -107,7 +125,7 @@ const getMemberLoanStatus = async (userId) => {
             expected_to_date: parseFloat(amountExpectedSoFar.toFixed(2)),
             running_balance: parseFloat(runningBalance.toFixed(2)),
             status_text: statusText,
-            grace_days_remaining: graceDaysRemaining // ✅ SEND TO FRONTEND
+            grace_days_remaining: graceDaysRemaining
         };
     }
 
