@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreditCard, AlertCircle, CheckCircle, Lock, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { CreditCard, AlertCircle, CheckCircle, Lock, Clock, TrendingUp, TrendingDown, PlusCircle } from 'lucide-react';
 
 export default function LoanStatusCard({ loan, onApply }) {
     // 1. NO ACTIVE LOAN VIEW
@@ -32,6 +32,10 @@ export default function LoanStatusCard({ loan, onApply }) {
     const isArrears = schedule.status_text === 'ARREARS';
     const isPrepayment = schedule.status_text === 'PREPAYMENT';
     const isGracePeriod = schedule.status_text === 'GRACE PERIOD';
+
+    // Top Up Logic
+    const canTopUp = loan.eligibility?.can_top_up;
+    const availableTopUp = loan.eligibility?.available_limit;
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
@@ -77,14 +81,14 @@ export default function LoanStatusCard({ loan, onApply }) {
                                     {schedule.status_text}
                                 </p>
                                 
-                                {/* Show Prepayment Amount even in Grace Period */}
+                                {/* Show Prepayment Amount */}
                                 {(isArrears || isPrepayment || (isGracePeriod && balance > 0)) && (
                                     <p className="text-sm font-bold text-slate-800">
                                         {balance < 0 ? '-' : '+'} KES {Math.abs(balance).toLocaleString()}
                                     </p>
                                 )}
                                 
-                                {/* Show Grace Days if in Grace Period */}
+                                {/* Show Grace Days */}
                                 {isGracePeriod && (
                                     <p className="text-sm font-bold text-slate-800">
                                         {schedule.grace_days_remaining} Days Left
@@ -105,6 +109,13 @@ export default function LoanStatusCard({ loan, onApply }) {
 
                     <div className="flex justify-between items-center text-xs bg-slate-50 p-2 rounded-lg">
                         <div className="text-slate-500">Weekly Due: <span className="font-bold text-slate-800">KES {schedule.weekly_installment?.toLocaleString()}</span></div>
+                        
+                        {/* ✅ NEW: TOP UP BUTTON */}
+                        {canTopUp && (
+                            <button onClick={onApply} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
+                                <PlusCircle size={12}/> Top Up (Limit: {availableLimit.toLocaleString()})
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

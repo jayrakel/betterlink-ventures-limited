@@ -5,6 +5,7 @@ const { getSetting } = require('../settings/settings.service');
 // --- 1. APPLICATION LOGIC ---
 
 const getMemberLoanStatus = async (userId) => {
+    // Fetch the LATEST application (could be an Active loan OR a new Draft)
     const result = await db.query(
         `SELECT id, status, fee_amount, amount_requested, amount_repaid, 
                 purpose, repayment_weeks, total_due, interest_amount, disbursed_at 
@@ -14,9 +15,11 @@ const getMemberLoanStatus = async (userId) => {
         [userId]
     );
     
-    // Eligibility Logic
+    // Eligibility Logic (Global)
     const minSavingsVal = await getSetting('min_savings_for_loan');
+    const multiplierVal = await getSetting('loan_multiplier');
     const minSavings = parseFloat(minSavingsVal) || 5000;
+    const multiplier = parseFloat(multiplierVal) || 3;
     
     const savingsRes = await db.query(
         "SELECT COALESCE(SUM(amount), 0) as total FROM deposits WHERE user_id = $1 AND status = 'COMPLETED' AND type = 'DEPOSIT'",
@@ -24,11 +27,27 @@ const getMemberLoanStatus = async (userId) => {
     );
     const currentSavings = parseFloat(savingsRes.rows[0].total);
 
+    // Calculate Outstanding Debt (From ALL active loans)
+    const debtRes = await db.query(
+        "SELECT COALESCE(SUM(total_due - amount_repaid), 0) as debt FROM loan_applications WHERE user_id = $1 AND status = 'ACTIVE'",
+        [userId]
+    );
+    const currentDebt = parseFloat(debtRes.rows[0].debt);
+
+    const maxBorrowingPower = currentSavings * multiplier;
+    const availableLimit = Math.max(0, maxBorrowingPower - currentDebt);
+
     const eligibility = {
         eligible: currentSavings >= minSavings,
         min_savings: minSavings,
         current_savings: currentSavings,
-        message: currentSavings >= minSavings ? "Eligible" : `Insufficient savings. Reach KES ${minSavings.toLocaleString()} to apply.`
+        max_borrowing_power: maxBorrowingPower,
+        current_debt: currentDebt,
+        available_limit: availableLimit,
+        can_top_up: availableLimit > 1000, // Minimum top-up amount
+        message: currentSavings >= minSavings 
+            ? `You qualify for KES ${availableLimit.toLocaleString()} (Top-up available)` 
+            : `Insufficient savings. Reach KES ${minSavings.toLocaleString()} to apply.`
     };
 
     if (result.rows.length === 0) return { status: 'NO_APP', eligibility };
@@ -71,7 +90,7 @@ const getMemberLoanStatus = async (userId) => {
         // 1. Calculate Expected Amount
         let installmentsDue = 0;
         if (effectiveWeeksPassed < 0) {
-            installmentsDue = 0; // Grace Period = 0 Due
+            installmentsDue = 0; 
         } else {
             installmentsDue = Math.min(effectiveWeeksPassed + 1, loan.repayment_weeks);
         }
@@ -83,10 +102,8 @@ const getMemberLoanStatus = async (userId) => {
         let statusText = '';
         let graceDaysRemaining = 0;
 
-        // ✅ FIX: Check Grace Period FIRST
         if (effectiveWeeksPassed < 0) {
             statusText = 'GRACE PERIOD';
-            // Calculate Countdown
             const graceEndDate = new Date(start.getTime() + (graceWeeks * oneWeekMs));
             const remainingMs = graceEndDate - now;
             graceDaysRemaining = Math.max(0, Math.ceil(remainingMs / oneDayMs));
@@ -113,11 +130,19 @@ const getMemberLoanStatus = async (userId) => {
 };
 
 const initApplication = async (userId) => {
-    const activeCheck = await db.query("SELECT id FROM loan_applications WHERE user_id = $1 AND status NOT IN ('REJECTED', 'COMPLETED') LIMIT 1", [userId]);
-    if (activeCheck.rows.length > 0) throw new Error("Active application exists");
+    // ✅ FIX: Allow creation if previous loans are 'ACTIVE', 'COMPLETED' or 'REJECTED'
+    // Only block if there is a truly "Pending" application (Draft, Submitted, Voting, etc.)
+    const activeCheck = await db.query(
+        "SELECT id FROM loan_applications WHERE user_id = $1 AND status NOT IN ('REJECTED', 'COMPLETED', 'ACTIVE') LIMIT 1", 
+        [userId]
+    );
+    
+    if (activeCheck.rows.length > 0) throw new Error("You already have a pending application. Please complete or cancel it first.");
 
+    // Check basic eligibility
     const statusObj = await getMemberLoanStatus(userId);
     if (!statusObj.eligibility.eligible) throw new Error(statusObj.eligibility.message);
+    if (statusObj.eligibility.available_limit < 1000) throw new Error("You have reached your borrowing limit.");
 
     const feeVal = await getSetting('loan_processing_fee');
     const processingFee = parseFloat(feeVal) || 500;
@@ -132,21 +157,24 @@ const initApplication = async (userId) => {
 const submitApplicationDetails = async (userId, data) => {
     const { loanAppId, amount, purpose, repaymentWeeks } = data;
     
-    // Ownership check
     const check = await db.query("SELECT user_id FROM loan_applications WHERE id=$1", [loanAppId]);
     if (check.rows.length === 0) throw new Error("Loan not found");
     if (check.rows[0].user_id !== userId) throw new Error("Unauthorized");
 
-    // Limit check
+    // ✅ FIX: Check against AVAILABLE LIMIT (Total Limit - Current Debt)
     const savingsRes = await db.query("SELECT SUM(amount) as total FROM deposits WHERE user_id = $1 AND status = 'COMPLETED'", [userId]);
+    const debtRes = await db.query("SELECT COALESCE(SUM(total_due - amount_repaid), 0) as debt FROM loan_applications WHERE user_id = $1 AND status = 'ACTIVE'", [userId]);
+    
     const multiplierVal = await getSetting('loan_multiplier');
     const multiplier = parseFloat(multiplierVal) || 3;
     
     const totalSavings = parseFloat(savingsRes.rows[0].total || 0);
-    const maxLimit = totalSavings * multiplier;
+    const currentDebt = parseFloat(debtRes.rows[0].debt || 0);
+    const maxBorrowingPower = totalSavings * multiplier;
+    const availableLimit = maxBorrowingPower - currentDebt;
 
-    if (parseInt(amount) > maxLimit) {
-        throw new Error(`Limit exceeded. Max Loan (${multiplier}x): ${maxLimit.toLocaleString()}`);
+    if (parseInt(amount) > availableLimit) {
+        throw new Error(`Limit exceeded. Available Limit: KES ${availableLimit.toLocaleString()} (Max: ${maxBorrowingPower.toLocaleString()} - Debt: ${currentDebt.toLocaleString()})`);
     }
 
     await db.query(
@@ -221,7 +249,6 @@ const disburseLoan = async (treasurerId, loanId) => {
         const loan = check.rows[0];
         const principal = parseFloat(loan.amount_requested);
         
-        // Calculate Interest
         const rateVal = await getSetting('loan_interest_rate'); 
         const rate = parseFloat(rateVal || 10);
         const totalInterest = principal * (rate / 100);
