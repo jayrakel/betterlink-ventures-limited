@@ -36,14 +36,12 @@ const getMemberLoanStatus = async (userId) => {
     // --- SCHEDULE LOGIC ---
     const loan = result.rows[0];
 
-    // Ensure numbers are parsed safely
     loan.amount_requested = parseFloat(loan.amount_requested || 0);
     loan.amount_repaid = parseFloat(loan.amount_repaid || 0);
     loan.total_due = parseFloat(loan.total_due || 0);
     loan.interest_amount = parseFloat(loan.interest_amount || 0);
     loan.repayment_weeks = parseInt(loan.repayment_weeks || 0);
 
-    // Default Schedule Object
     loan.schedule = {
         weekly_installment: 0,
         weeks_passed: 0,
@@ -51,10 +49,9 @@ const getMemberLoanStatus = async (userId) => {
         expected_to_date: 0,
         running_balance: 0,
         status_text: 'Pending',
-        grace_days_remaining: 0 // ✅ NEW FIELD
+        grace_days_remaining: 0
     };
 
-    // Calculate Weekly Schedule Only if Active & Disbursed
     if (loan.status === 'ACTIVE' && loan.disbursed_at && loan.total_due > 0) {
         const graceVal = await getSetting('loan_grace_period_weeks');
         const graceWeeks = parseInt(graceVal) || 4; 
@@ -64,7 +61,6 @@ const getMemberLoanStatus = async (userId) => {
         const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
         const oneDayMs = 24 * 60 * 60 * 1000;
         
-        // Prevent Division by Zero
         const weeks = loan.repayment_weeks > 0 ? loan.repayment_weeks : 1;
         const weeklyAmount = loan.total_due / weeks;
         
@@ -74,48 +70,32 @@ const getMemberLoanStatus = async (userId) => {
 
         // 1. Calculate Expected Amount
         let installmentsDue = 0;
-        
         if (effectiveWeeksPassed < 0) {
-            // In Grace Period: Nothing is strictly "due" yet
-            installmentsDue = 0; 
+            installmentsDue = 0; // Grace Period = 0 Due
         } else {
-            // Grace Period Over: Count weeks passed since grace ended
-            // Cap at repayment_weeks (can't owe more than total loan)
             installmentsDue = Math.min(effectiveWeeksPassed + 1, loan.repayment_weeks);
         }
         
         const amountExpectedSoFar = installmentsDue * weeklyAmount;
-        
-        // 2. Calculate Strict Running Balance
-        // Positive = Prepayment (Paid more than expected)
-        // Negative = Arrears (Paid less than expected)
         const runningBalance = loan.amount_repaid - amountExpectedSoFar;
 
-        // 3. Determine Status (Strict)
+        // 2. Determine Status (Prioritize Grace Period)
         let statusText = '';
         let graceDaysRemaining = 0;
 
-        if (runningBalance < 0) {
-            // STRICT: Even -1 is Arrears
-            statusText = 'ARREARS'; 
-        } else if (runningBalance > 0) {
-            // STRICT: Even +1 is Prepayment (Includes payments made during Grace Period)
-            statusText = 'PREPAYMENT'; 
-        } else {
-            // Exactly 0 Balance
-            if (effectiveWeeksPassed < 0) {
-                statusText = 'GRACE PERIOD'; // Only show this if they haven't paid anything extra
-            } else {
-                statusText = 'UP TO DATE'; // Replaced "On Track" with strict "Up to Date"
-            }
-        }
-
-        // Calculate Grace Countdown (Visual Helper)
+        // ✅ FIX: Check Grace Period FIRST
         if (effectiveWeeksPassed < 0) {
-            const oneDayMs = 24 * 60 * 60 * 1000;
+            statusText = 'GRACE PERIOD';
+            // Calculate Countdown
             const graceEndDate = new Date(start.getTime() + (graceWeeks * oneWeekMs));
             const remainingMs = graceEndDate - now;
             graceDaysRemaining = Math.max(0, Math.ceil(remainingMs / oneDayMs));
+        } else if (runningBalance < 0) {
+            statusText = 'ARREARS'; 
+        } else if (runningBalance > 0) {
+            statusText = 'PREPAYMENT'; 
+        } else {
+            statusText = 'UP TO DATE';
         }
 
         loan.schedule = {
@@ -187,13 +167,11 @@ const addGuarantor = async (userId, loanId, guarantorId) => {
 };
 
 const respondToGuarantorRequest = async (userId, requestId, decision) => {
-    // Basic accept logic
     const check = await db.query("SELECT loan_application_id FROM loan_guarantors WHERE id=$1 AND guarantor_id=$2", [requestId, userId]);
     if (check.rows.length === 0) throw new Error("Unauthorized request");
 
     await db.query("UPDATE loan_guarantors SET status=$1 WHERE id=$2", [decision, requestId]);
     
-    // Sync array
     const loanId = check.rows[0].loan_application_id;
     await db.query(
         `UPDATE loan_applications SET guarantor_ids = ARRAY(SELECT guarantor_id FROM loan_guarantors WHERE loan_application_id = $1 AND status = 'ACCEPTED') WHERE id = $1`, 

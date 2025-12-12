@@ -27,8 +27,11 @@ export default function LoanStatusCard({ loan, onApply }) {
     const isActive = loan.status === 'ACTIVE';
     const schedule = loan.schedule || {};
     const balance = schedule.running_balance || 0;
+    
+    // Status Flags
     const isArrears = schedule.status_text === 'ARREARS';
     const isPrepayment = schedule.status_text === 'PREPAYMENT';
+    const isGracePeriod = schedule.status_text === 'GRACE PERIOD';
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
@@ -49,7 +52,7 @@ export default function LoanStatusCard({ loan, onApply }) {
                 </div>
             </div>
 
-            {/* Performance Widget (Arrears/Prepayment) */}
+            {/* Performance Widget */}
             {isActive && (
                 <div className="mt-4 pt-4 border-t border-slate-100">
                     
@@ -57,12 +60,13 @@ export default function LoanStatusCard({ loan, onApply }) {
                     <div className={`p-3 rounded-xl flex items-center justify-between mb-4 ${
                         isArrears ? 'bg-red-50 border border-red-100' : 
                         isPrepayment ? 'bg-emerald-50 border border-emerald-100' : 
-                        'bg-blue-50 border border-blue-100'
+                        isGracePeriod ? 'bg-blue-50 border border-blue-100' :
+                        'bg-slate-50 border border-slate-100'
                     }`}>
                         <div className="flex items-center gap-2">
                             {isArrears && <TrendingDown size={18} className="text-red-600"/>}
                             {isPrepayment && <TrendingUp size={18} className="text-emerald-600"/>}
-                            {schedule.status_text === 'GRACE PERIOD' && <Clock size={18} className="text-blue-600"/>}
+                            {isGracePeriod && <Clock size={18} className="text-blue-600"/>}
                             
                             <div>
                                 <p className={`text-xs font-bold uppercase ${
@@ -73,15 +77,15 @@ export default function LoanStatusCard({ loan, onApply }) {
                                     {schedule.status_text}
                                 </p>
                                 
-                                {/* Show Amount for Arrears/Prepayment */}
-                                {(isArrears || isPrepayment) && (
+                                {/* Show Prepayment Amount even in Grace Period */}
+                                {(isArrears || isPrepayment || (isGracePeriod && balance > 0)) && (
                                     <p className="text-sm font-bold text-slate-800">
-                                        {isArrears ? '-' : '+'} KES {Math.abs(balance).toLocaleString()}
+                                        {balance < 0 ? '-' : '+'} KES {Math.abs(balance).toLocaleString()}
                                     </p>
                                 )}
                                 
                                 {/* Show Grace Days if in Grace Period */}
-                                {schedule.status_text === 'GRACE PERIOD' && (
+                                {isGracePeriod && (
                                     <p className="text-sm font-bold text-slate-800">
                                         {schedule.grace_days_remaining} Days Left
                                     </p>
